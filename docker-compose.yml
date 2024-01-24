@@ -113,8 +113,8 @@ services:
       POSTGREST_INTERNAL_HOSTNAME: postgrest
       SPOKE_INTERNAL_HOSTNAME: spoke
     volumes:
-      - letsencrypt:/code/certs
       - reticulum:/code
+      - letsencrypt:/code/certs
       - retstorage:/code/storage/dev
   spoke:
     build:
