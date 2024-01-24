@@ -1,5 +1,26 @@
 version: "3.9"
 services:
+  haproxy:
+      container_name: haproxy
+      environment:
+          - CERT1=hubs.tobias-weiss.org
+            #- CERT2=yoursite.com, www.yoursite.com
+          - EMAIL=tobias@tobias-weiss.org
+          - STAGING=false
+      volumes:
+          - 'letsencrypt:/etc/letsencrypt'
+          - './haproxy/haproxy.cfg:/etc/haproxy/haproxy.cfg'
+      ports:
+          - '80:80'
+          - '443:443'
+      image: 'ghcr.io/tomdess/docker-haproxy-certbot:master'
+  rsyslog:
+      container_name: rsyslog
+      environment:
+          - TZ=UTC
+      ports:
+          - '514:514'
+      image: 'rsyslog/syslog_appliance_alpine'
   db:
     environment:
       POSTGRES_PASSWORD: postgres
@@ -53,6 +74,7 @@ services:
       - "8080:8080"
     volumes:
       - hubs:/code
+      - letsencrypt:/code/certs
     working_dir: /code
   hubs-storybook:
     build:
@@ -72,10 +94,13 @@ services:
       context: .
       dockerfile: dockerfiles/postgrest.Dockerfile
   reticulum:
+    container_name: reticulum
     build:
       context: ./services/reticulum
       dockerfile: TurkeyDockerfile
       target: dev
+    ports:
+      - "4000:4000"
     depends_on:
       - db
     environment:
@@ -87,9 +112,8 @@ services:
       HUBS_CLIENT_INTERNAL_HOSTNAME: hubs-client
       POSTGREST_INTERNAL_HOSTNAME: postgrest
       SPOKE_INTERNAL_HOSTNAME: spoke
-    ports:
-      - "4000:4000"
     volumes:
+      - letsencrypt:/code/certs
       - reticulum:/code
       - retstorage:/code/storage/dev
   spoke:
@@ -97,7 +121,7 @@ services:
       context: .
       dockerfile: dockerfiles/spoke.Dockerfile
     environment:
-      CORS_PROXY_SERVER: "hubs-proxy.local:4000"
+      CORS_PROXY_SERVER: "hubs-proxy.tobias-weiss.org"
       INTERNAL_HOSTNAME: spoke
     platform: linux/amd64
     ports:
@@ -110,6 +134,7 @@ networks:
 volumes:
   dialog:
   hubs:
+  letsencrypt:
   pgdata:
   reticulum:
   retstorage:
@@ -136,6 +161,9 @@ x-mutagen:
         paths:
           - "/admin/certs/"
           - "/admin/node_modules/"
+    letsencrypt:
+      alpha: ./haproxy/letsencrypt
+      beta: "volume://letsencrypt"
     reticulum:
       alpha: ./services/reticulum
       beta: "volume://reticulum"
